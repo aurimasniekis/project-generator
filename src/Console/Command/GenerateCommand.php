@@ -7,11 +7,13 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Console\Question\Question;
 use Funct\Strings;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
+use Symfony\Component\Process\Process;
 
 /**
  * Class GenerateCommand
@@ -39,7 +41,7 @@ class GenerateCommand extends Command
         $output->writeln(
             [
                 $this->getApplication()->getLongVersion(),
-                ''
+                '',
             ]
         );
 
@@ -51,7 +53,7 @@ class GenerateCommand extends Command
             $output->writeln(
                 [
                     '',
-                    '<error>Error: Project name cannot be empty</error>'
+                    '<error>Error: Project name cannot be empty</error>',
                 ]
             );
 
@@ -62,21 +64,21 @@ class GenerateCommand extends Command
             $output->writeln(
                 [
                     '',
-                    '<error>Error: Project name must be title case</error>'
+                    '<error>Error: Project name must be title case</error>',
                 ]
             );
 
             return 1;
         }
 
-        $nameCan = Strings\dasherize($name);
+        $nameCan     = Strings\dasherize($name);
         $projectPath = getcwd() . '/' . $nameCan;
 
         if (file_exists($projectPath) || is_dir($projectPath)) {
             $output->writeln(
                 [
                     '',
-                    '<error>Error: Project with name "' . $nameCan . '" already exists</error>'
+                    '<error>Error: Project with name "' . $nameCan . '" already exists</error>',
                 ]
             );
 
@@ -84,7 +86,7 @@ class GenerateCommand extends Command
         }
 
         $projectTypes = ['Component', 'Tool', 'Bundle', 'Action'];
-        $question = new Question('<question>Please enter project type (Component):</question> ', 'Component');
+        $question     = new Question('<question>Please enter project type (Component):</question> ', 'Component');
         $question->setAutocompleterValues($projectTypes);
 
         $projectType = $helper->ask($input, $output, $question);
@@ -93,7 +95,7 @@ class GenerateCommand extends Command
             $output->writeln(
                 [
                     '',
-                    '<error>Error: Project type cannot be empty</error>'
+                    '<error>Error: Project type cannot be empty</error>',
                 ]
             );
 
@@ -104,14 +106,14 @@ class GenerateCommand extends Command
             $output->writeln(
                 [
                     '',
-                    '<error>Error: Project type must be title case</error>'
+                    '<error>Error: Project type must be title case</error>',
                 ]
             );
 
             return 1;
         }
 
-        $author = rtrim(shell_exec("git config --get user.name"));
+        $author    = rtrim(shell_exec("git config --get user.name"));
         $authorSug = '';
         if (null !== $author) {
             $authorSug = '(' . $author . ')';
@@ -124,14 +126,14 @@ class GenerateCommand extends Command
             $output->writeln(
                 [
                     '',
-                    '<error>Error: Author cannot be empty</error>'
+                    '<error>Error: Author cannot be empty</error>',
                 ]
             );
 
             return 1;
         }
 
-        $email = rtrim(shell_exec("git config --get user.email"));
+        $email    = rtrim(shell_exec("git config --get user.email"));
         $emailSug = '';
         if (null !== $email) {
             $emailSug = '(' . $email . ')';
@@ -144,26 +146,34 @@ class GenerateCommand extends Command
             $output->writeln(
                 [
                     '',
-                    '<error>Error: Email cannot be empty</error>'
+                    '<error>Error: Email cannot be empty</error>',
                 ]
             );
 
             return 1;
         }
 
-        $question = new Question('<question>Please enter git repository:</question> ');
+        $question = new ConfirmationQuestion('<question>Do you want to create repository on Github?</question>');
 
-        $repo = $helper->ask($input, $output, $question);
+        $createRepo = $helper->ask($input, $output, $question);
 
-        if (empty($email)) {
-            $output->writeln(
-                [
-                    '',
-                    '<error>Error: Git repository cannot be empty</error>'
-                ]
-            );
+        if (true === $createRepo) {
+            $repo = 'git@github.com:tasksuki/' . $name . '.git';
+        } else {
+            $question = new Question('<question>Please enter git repository:</question> ');
 
-            return 1;
+            $repo = $helper->ask($input, $output, $question);
+
+            if (empty($repo)) {
+                $output->writeln(
+                    [
+                        '',
+                        '<error>Error: Git repository cannot be empty</error>',
+                    ]
+                );
+
+                return 1;
+            }
         }
 
         $output->writeln(['']);
@@ -206,7 +216,7 @@ class GenerateCommand extends Command
                 '${PROJECT_TYPE}$',
                 '${YEAR}$',
                 '${AUTHOR}$',
-                '${EMAIL}$'
+                '${EMAIL}$',
             ];
 
             $replaceWith = [
@@ -215,7 +225,7 @@ class GenerateCommand extends Command
                 $projectType,
                 $year,
                 $author,
-                $email
+                $email,
             ];
 
             $progress->setMessage($file->getFilename());
@@ -229,8 +239,23 @@ class GenerateCommand extends Command
         }
 
         $progress->finish();
+        $output->writeln('<comment>Done</comment>');
 
-        $git->remote('add', 'origin', $repo);
+        if (true === $createRepo) {
+            $output->write('<info>Creating Github repository: </info>');
+            $description = 'The Tasksuki ' . $name . ' ' . $projectType . '.';
+
+            $process = new Process(
+                'hub create -d ' . $description . ' "tasksuki/' . $name . '"', getcwd() . '/' . $name
+            );
+
+            $process->run();
+
+            $output->writeln('<comment>Done</comment>');
+        } else {
+            $git->remote('add', 'origin', $repo);
+        }
+
         $git->add('./');
 
         $output->writeln(['', '', '<comment>Finished.</comment>']);
