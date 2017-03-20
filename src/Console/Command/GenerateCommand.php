@@ -239,6 +239,7 @@ class GenerateCommand extends Command
         }
 
         $progress->finish();
+        $output->writeln('');
         $output->writeln('<comment>Done</comment>');
 
         if (true === $createRepo) {
@@ -246,7 +247,7 @@ class GenerateCommand extends Command
             $description = 'The Tasksuki ' . $name . ' ' . $projectType . '.';
 
             $process = new Process(
-                'hub create -d ' . $description . ' "tasksuki/' . $name . '"', getcwd() . '/' . $name
+                'hub create -d "' . $description . '" "tasksuki/' . $nameCan . '"', getcwd() . '/' . $nameCan
             );
 
             $process->run();
